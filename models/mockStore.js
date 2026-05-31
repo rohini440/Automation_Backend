@@ -159,7 +159,8 @@ const initializeMockData = async () => {
     name: 'Admin Developer',
     email: 'admin@inventory.com',
     password: hashedPassword,
-    createdAt: new Date()
+    createdAt: new Date(),
+    setupCompleted: true
   });
   console.log('\x1b[35m%s\x1b[0m', '🛡️  Mock Database initialized with default user: admin@inventory.com (password: password123)');
 };

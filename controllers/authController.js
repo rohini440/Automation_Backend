@@ -30,7 +30,8 @@ const registerUser = async (req, res) => {
         name,
         email: email.toLowerCase(),
         password: hashedPassword,
-        createdAt: new Date()
+        createdAt: new Date(),
+        setupCompleted: false
       };
 
       mockUsers.push(newUser);
@@ -41,7 +42,8 @@ const registerUser = async (req, res) => {
         user: {
           id: newUser._id,
           name: newUser.name,
-          email: newUser.email
+          email: newUser.email,
+          setupCompleted: false
         }
       });
     } else {
@@ -63,7 +65,8 @@ const registerUser = async (req, res) => {
         user: {
           id: user._id,
           name: user.name,
-          email: user.email
+          email: user.email,
+          setupCompleted: false
         }
       });
     }
@@ -101,7 +104,8 @@ const loginUser = async (req, res) => {
         user: {
           id: user._id,
           name: user.name,
-          email: user.email
+          email: user.email,
+          setupCompleted: user.setupCompleted || false
         }
       });
     } else {
@@ -122,7 +126,8 @@ const loginUser = async (req, res) => {
         user: {
           id: user._id,
           name: user.name,
-          email: user.email
+          email: user.email,
+          setupCompleted: user.setupCompleted || false
         }
       });
     }
@@ -138,7 +143,56 @@ const getUserProfile = async (req, res) => {
   try {
     res.json({
       success: true,
-      user: req.user
+      user: {
+        id: req.user.id || req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        setupCompleted: req.user.setupCompleted || false
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Complete new user organization setup
+// @route   POST /api/auth/setup
+// @access  Private
+const completeSetup = async (req, res) => {
+  try {
+    const { organizationName } = req.body;
+    
+    if (getDBMode()) {
+      const userIndex = mockUsers.findIndex(u => u._id === (req.user.id || req.user._id));
+      if (userIndex !== -1) {
+        mockUsers[userIndex].setupCompleted = true;
+        if (organizationName) {
+          mockUsers[userIndex].name = organizationName;
+        }
+        req.user.setupCompleted = true;
+        req.user.name = mockUsers[userIndex].name;
+      }
+    } else {
+      const user = await User.findById(req.user.id || req.user._id);
+      if (user) {
+        user.setupCompleted = true;
+        if (organizationName) {
+          user.name = organizationName;
+        }
+        await user.save();
+        req.user.setupCompleted = true;
+        req.user.name = user.name;
+      }
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: req.user.id || req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        setupCompleted: true
+      }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -148,5 +202,6 @@ const getUserProfile = async (req, res) => {
 module.exports = {
   registerUser,
   loginUser,
-  getUserProfile
+  getUserProfile,
+  completeSetup
 };

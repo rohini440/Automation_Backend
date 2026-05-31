@@ -69,16 +69,47 @@ app.use('/api/invoices', invoiceRoutes);
 // Global Error Handler
 app.use(errorHandler);
 
+const { exec } = require('child_process');
+
 const PORT = process.env.PORT || 5050;
 
 // Initialize Server & Database
 const startServer = async () => {
   await connectDB();
   
-  app.listen(PORT, () => {
+  const server = app.listen(PORT);
+  
+  server.on('listening', () => {
     console.log('\x1b[32m%s\x1b[0m', `🚀 Express Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
     console.log('\x1b[36m%s\x1b[0m', `🔗 Healthcheck Endpoint: http://localhost:${PORT}/api/health`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`\x1b[33m⚠️  Port ${PORT} is already in use.\x1b[0m`);
+      console.log(`💡 Attempting to automatically free up port ${PORT}...`);
+      
+      const cmd = process.platform === 'win32'
+        ? `powershell -Command "Stop-Process -Id (Get-NetTCPConnection -LocalPort ${PORT}).OwningProcess -Force"`
+        : `kill -9 $(lsof -t -i:${PORT})`;
+        
+      exec(cmd, (execErr, stdout, stderr) => {
+        if (execErr) {
+          console.log(`\x1b[31m❌ Auto-recovery failed:\x1b[0m Port ${PORT} could not be freed: ${execErr.message}`);
+          console.log(`💡 Please manually close the process holding port ${PORT} or check permissions.`);
+          process.exit(1);
+        } else {
+          console.log(`\x1b[32m✅ Successfully cleared port ${PORT}!\x1b[0m Restarting server in 1.5 seconds...`);
+          setTimeout(() => {
+            startServer();
+          }, 1500);
+        }
+      });
+    } else {
+      console.error('❌ Server error:', err);
+    }
   });
 };
 
 startServer();
+
